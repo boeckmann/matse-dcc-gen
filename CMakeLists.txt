@@ -6,9 +6,9 @@ SET(CMAKE_C_COMPILER ${AVRBIN}/avr-gcc)
 SET(CMAKE_CXX_COMPILER ${AVRBIN}/avr-g++)
 
 #============================================================================================
-PROJECT(rail03)		  		# <-- Prjektname
+PROJECT(berndcc-gen)		  		# <-- Prjektname
 
-SET(FILES main.c serial.c serial.h)		  	# <-- Quelldatei(en)
+SET(FILES main.c serial.c serial.h train.c train.h bitstream.c bitstream.h cmd.c cmd.h util.c util.h isr_dcc.c version.c version.h)		  	# <-- Quelldatei(en)
 
 SET(DEVICE atmega328p)			# <-- MCU
 SET(FREQ 16000000)			# <-- MCU-Frequenz
