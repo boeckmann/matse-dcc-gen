@@ -56,11 +56,11 @@ Train* train_init(Train *train, uint8_t addr)
     train->addr = addr;
     train->f0 = 0;
     train->speed = 0;
-    train->direction = 1;
+    train->direction = TRAIN_FORWARD;
     train->active = 0;
 
     train->curr_bitstream = 0;
-    train->speed_stream.active = 0;
+    train->speed_stream.lock = 0;
 
     train_update_bitstream(train);
 
@@ -78,7 +78,7 @@ void train_init_function_bitstream(Train *train, BitStream *stream, uint8_t data
     stream->data[0] = train->addr;
     stream->data[1] = data;
     stream->data[2] = train->addr ^ data;
-    stream->active = 0;
+    stream->lock = 0;
 }
 
 void train_activate(Train *train)
@@ -107,15 +107,15 @@ void train_enable_function(Train *train, uint8_t f)
         bitstream_update_checksum(&train->f00_04_stream);
     }
     else if (f < 5) {
-        train->f00_04_stream.data[1] |= 1 << (4-f);
+        train->f00_04_stream.data[1] |= 1 << (f-1);
         bitstream_update_checksum(&train->f00_04_stream);
     }
     else if (f < 9) {
-        train->f05_08_stream.data[1] |= 1 << (8-f);
+        train->f05_08_stream.data[1] |= 1 << (f-5);
         bitstream_update_checksum(&train->f05_08_stream);
     }
     else if (f < 13) {
-        train->f09_12_stream.data[1] |= 1 << (12-f);
+        train->f09_12_stream.data[1] |= 1 << (f-9);
         bitstream_update_checksum(&train->f09_12_stream);
     }
 }
@@ -129,19 +129,19 @@ void train_disable_function(Train *train, uint8_t f)
             train_update_bitstream(train);
         }
 
-        train->f00_04_stream.data[1] ^= 1 << 4;
+        train->f00_04_stream.data[1] &= ~(1 << 4);
         bitstream_update_checksum(&train->f00_04_stream);
     }
     else if (f < 5) {
-        train->f00_04_stream.data[1] ^= 1 << (4-f);
+        train->f00_04_stream.data[1] &= ~(1 << (f-1));
         bitstream_update_checksum(&train->f00_04_stream);
     }
     else if (f < 9) {
-        train->f05_08_stream.data[1] ^= 1 << (8-f);
+        train->f05_08_stream.data[1] &= ~(1 << (f-5));
         bitstream_update_checksum(&train->f05_08_stream);
     }
     else if (f < 13) {
-        train->f09_12_stream.data[1] ^= 1 << (12-f);
+        train->f09_12_stream.data[1] &= ~(1 << (f-9));
         bitstream_update_checksum(&train->f09_12_stream);
     }
 }
@@ -192,32 +192,53 @@ void trains_emergency_stop(int8_t stop)
 }
 
 
+// Läuft im Kontext der ISR
 BitStream* train_schedule_next_bitstream(Train *train)
 {
+    BitStream *next_stream;
+
+try_next:
     switch (train->curr_bitstream) {
         case 0:
             train->curr_bitstream++;
-            return &train->speed_stream;
+            next_stream = &train->speed_stream;
+            break;
         case 1:
             train->curr_bitstream++;
-            return &train->f00_04_stream;
+            next_stream = &train->f00_04_stream;
+            break;
         case 2:
             train->curr_bitstream++;
-            return &train->f05_08_stream;
+            next_stream = &train->f05_08_stream;
+            break;
         case 3:
             train->curr_bitstream = 0;
-            return &train->f09_12_stream;
+            next_stream = &train->f09_12_stream;
+            break;
         default:
-            return &train->speed_stream;
+            train->curr_bitstream = 0;
+            next_stream = &train->speed_stream;
     }
+    // Wird Bitstream gerade aktualisiert? Dann einen anderen wählen!
+    if (next_stream->lock) goto try_next;
+
+    return next_stream;
 }
 
-
+// Läuft im Kontext der ISR
 BitStream* trains_schedule_next_bitstream()
 {
+    static int odd = 0;
+    
+    odd ^= 1;   // markiert jedes zweite Datenpaket
+
     if (trains_estop) return &estop_bitstream;
 
-    if (!num_trains_active) return &idle_bitstream;
+    // Idle Kommando senden wenn keine Züge aktiv ist. Weiterhin jedes zweite
+    // Paket als Idle Kommando senden wenn nur ein Zug aktiv ist, um 5ms
+    // Zeitintervall zwischen den Paketen an die gleiche Adresse einzuhalten.
+    if (!num_trains_active ||
+        (num_trains_active == 1 && odd)) return &idle_bitstream;
 
     do {
         curr_train = curr_train->next;
@@ -230,8 +251,6 @@ BitStream* trains_schedule_next_bitstream()
 static void train_update_bitstream(Train *train)
 {
     BitStream *stream = &train->speed_stream;
-
-    while (stream->active);
 
     stream->length = 3;
     stream->data[0] = train->addr;
@@ -250,8 +269,10 @@ static void train_update_bitstream(Train *train)
             speed_and_dir = speed_and_dir | (uint8_t)((spd & 0x1e) >> 1) | (uint8_t)((spd & 1) << 4);
         }
     }
-    stream->data[1] = speed_and_dir;
 
+    stream->lock = 1;
+    stream->data[1] = speed_and_dir;
     bitstream_update_checksum(stream);
+    stream->lock = 0;
 }
 

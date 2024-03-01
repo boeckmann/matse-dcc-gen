@@ -129,7 +129,7 @@ int cmd_train_speed_and_dir(uint8_t addr, const char *cmd)
     if (!has_two_chars(cmd)) return 0;
 
     uint8_t speed = two_digits_to_num(cmd);
-    if (speed >= 28) return 0;
+    if (speed > 28) return 0;
 
     Train *train = train_by_addr((uint8_t)addr);
 

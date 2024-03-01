@@ -6,6 +6,7 @@
 #include <string.h>
 #include <stdlib.h>
 
+#include "track.h"
 #include "train.h"
 #include "bitstream.h"
 #include "serial.h"
@@ -32,46 +33,48 @@ void avr_init()
     TCCR0B |= (1<<CS01); // Prescaler 8
     OCR0A = 255;
     TIMSK0 |= (1<<OCIE0A); // Compare Interrupt für Timer 0 erlauben
-
     // 1000Hz counter initialisieren
     // TCCR2A = (1<<WGM21);
     // TCCR2B |= (1<<CS22);   // Prescaler 64
     // OCR2A = 249;
     // TIMSK2 |= (1<<OCIE2A);
-
-    DDRB = 0xff;    // Port B als Ausgabe Konfigurieren
-    PORTB = 1;      // Ausgabe initialisieren
 }
 
 static char cmd[16];
 
-
-void main()
+int main(void)
 {
     avr_init();
+    track_init();
+
     serial_init(9600);
 
     sei();          // Global Interrupts aktivieren
 
     serial_puts("READY\r\n");
 
+    track_a_set_power( 1 );
+
     while(1) {
 
         if (serial_recv_cmd(cmd, sizeof(cmd))) {
+            //serial_puts(cmd);
             if (cmd_process(cmd)) {
                 serial_puts("?OK\r\n");
             } else {
                 serial_puts("?ERR\r\n");
             }
-            //serial_puts(cmd);
         }
     }
+
+    return 0;
 }
 
-
+#if 0
 ISR (TIMER2_COMPA_vect)
 {
     sei();  // Interrupts reaktivieren damit Signal-ISR
             // nicht aus dem Tritt kommt
     hiqhfreq_counter++;
 }
+#endif

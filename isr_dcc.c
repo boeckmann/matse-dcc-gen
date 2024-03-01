@@ -5,6 +5,7 @@
 
 #include <avr/interrupt.h>
 #include "bitstream.h"
+#include "track.h"
 #include "train.h"
 
 #define NUM_SYNC_BITS 17
@@ -42,8 +43,7 @@ ISR (TIMER0_COMPA_vect)
     static uint8_t *data;
     static uint8_t data_bit_length;
 
-
-    PORTB ^= 1 << PORTB1 | 1 << PORTB0; // Toggle input
+    track_a_toggle_polarity();
 
     if (current_bit) OCR0A = SHORT_PULSE;   // schedule next timer
     else OCR0A = LONG_PULSE;                // 58us for logic one
@@ -59,25 +59,20 @@ ISR (TIMER0_COMPA_vect)
                     packet_state = DATA_START;
                     sync_bit_pos = 0;
 
+                    //PORTB ^= 1 << PORTB1; // Toggle input 
                     stream = trains_schedule_next_bitstream();
-
-                    stream->active = 1;
                     data = stream->data;
                     data_bit_length = stream->length << 3;
                     data_bit_pos = 0;
-
+                    //PORTB ^= 1 << PORTB1; // Toggle input 
                 } else {
                     sync_bit_pos++;
                 }
-
                 break;
 
             case DATA_START:
                 current_bit = LOW;
                 packet_state = DATA;
-
-                //if (data_bit_pos == 0) OCR0A = 255;
-
                 break;
 
             case DATA:
@@ -89,7 +84,6 @@ ISR (TIMER0_COMPA_vect)
 
                 if ((data_bit_pos & 7) == 7) {
                     if (data_bit_pos == (data_bit_length - 1)) {
-                        stream->active = 0;
                         packet_state = SYNC;
                     } else {
                         packet_state = DATA_START;
