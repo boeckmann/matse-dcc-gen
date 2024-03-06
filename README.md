@@ -10,6 +10,10 @@ Bei auftreten eines Fehlers `?ERR` und Zeilenvorschub.
 Folgende Kommandos werden akzeptiert:
 
     !I          Gerät initialisieren und Version senden
+    !R          Rücksetzbefehl (unimplementiert)
+
+    !zzzC+      14 Fahrstufen
+    !zzzC-      28 Fahrstufen (standard)
 
     !H+         Nothalt für alle Züge ein
     !H-         Nothalt aus
