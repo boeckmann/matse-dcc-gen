@@ -25,8 +25,8 @@ typedef enum {
 } PacketState;
 
 typedef enum {
-    LOW,
-    HIGH
+    BIT_ZERO,
+    BIT_ONE
 } Bit;
 
 
@@ -36,7 +36,7 @@ ISR (TIMER0_COMPA_vect)
     static uint8_t sync_bit_pos = 0;
 
     static PacketState packet_state = SYNC;
-    static Bit current_bit = LOW;
+    static Bit current_bit = BIT_ZERO;
     static PeriodState period_state = FIRST_HALF;
 
     static BitStream *stream;
@@ -54,7 +54,7 @@ ISR (TIMER0_COMPA_vect)
 
         switch (packet_state) {
             case SYNC:
-                current_bit = HIGH;
+                current_bit = BIT_ONE;
                 if (sync_bit_pos == NUM_SYNC_BITS - 1) {
                     packet_state = DATA_START;
                     sync_bit_pos = 0;
@@ -71,17 +71,20 @@ ISR (TIMER0_COMPA_vect)
                 break;
 
             case DATA_START:
-                current_bit = LOW;
+                current_bit = BIT_ZERO;
                 packet_state = DATA;
                 break;
 
             case DATA:
-                if (data[data_bit_pos >> 3] & (1 << (7 - (data_bit_pos & 0x07)))) {
-                    current_bit = HIGH;
+                // Bit an aktueller Datenstromposition maskieren und testen
+                if (data[data_bit_pos >> 3] & (1 << (7 - (data_bit_pos & 7)))) {
+                    current_bit = BIT_ONE;
                 } else {
-                    current_bit = LOW;
+                    current_bit = BIT_ZERO;
                 }
 
+                // An Bytegrenze testen ob Paketende erreicht ist, wenn ja
+                // weiter mit Synchronisation, ansonsten Startbit (0) senden
                 if ((data_bit_pos & 7) == 7) {
                     if (data_bit_pos == (data_bit_length - 1)) {
                         packet_state = SYNC;
