@@ -1,11 +1,16 @@
 #ifndef TRAIN_H
 #define TRAIN_H
 
-#define DCC_MODE_14 0
-#define DCC_MODE_28 1
+enum {
+    DCC_MODE_14,
+    DCC_MODE_28,
+    DCC_MODE_128
+};
 
-#define TRAIN_FORWARD  1
-#define TRAIN_BACKWARD 0
+enum {
+    TRAIN_BACKWARD,
+    TRAIN_FORWARD
+};
 
 #include "bitstream.h"
 
@@ -15,6 +20,7 @@ typedef struct Train {
     uint8_t speed;
     uint8_t direction;
     uint8_t f0;
+    uint8_t functions[9]; // Functions 0-68
 
     uint8_t active; // signal for train active
     uint8_t curr_bitstream;

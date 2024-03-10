@@ -92,13 +92,17 @@ int cmd_train_dcc_mode( uint16_t addr, const char *cmd )
         return 0;
     }
 
-    if ( *cmd == '+' ) { // 14 Fahrstufen
+    if ( *cmd == '+' || *cmd == '0') { // 14 Fahrstufen
         Train *train = train_by_addr( addr );
         train_set_dcc_mode( train, DCC_MODE_14 );
     }
-    else if ( *cmd == '-' ) { // 28 Fahrstufen
+    else if ( *cmd == '-' || *cmd == '1' ) { // 28 Fahrstufen
         Train *train = train_by_addr( addr );
         train_set_dcc_mode( train, DCC_MODE_28 );
+    }
+    else if ( *cmd == '2' ) {
+        Train *train = train_by_addr( addr );
+        train_set_dcc_mode( train, DCC_MODE_128 );        
     }
     else {
         return 0;
@@ -137,11 +141,18 @@ int cmd_train_speed_and_dir( uint16_t addr, const char *cmd )
     }
 
     uint8_t speed = str_to_uint8( &cmd );
-    if ( speed > 28 ) {
-        return 0;
-    }
 
     Train *train = train_by_addr( addr );
+
+    if ( train->dcc_mode == DCC_MODE_14 && speed > 14 ) {
+        return 0;
+    }
+    else if ( train->dcc_mode == DCC_MODE_28 && speed > 28 ) {
+        return 0;
+    }
+    else if ( speed > 126 ) {
+        return 0;
+    }
 
     if ( addr > 0 ) {
         if ( dir == 'V' ) {

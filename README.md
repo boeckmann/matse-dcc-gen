@@ -36,7 +36,10 @@ Folgende Kommandos werden akzeptiert:
     !R          Rücksetzbefehl (unimplementiert)
 
     !zzzC+      14 Fahrstufen-Modus für Zug zzz
+    !zzzC0      14 Fahrstufen-Modus
     !zzzC-      28 Fahrstufen-Modus für Zug zzz (standard)
+    !zzzC1      28 Fahrstufen-Modus
+    !zzzC2      128 Fahrstufen für Zug zzz
 
     !H+         Nothalt für alle Züge ein
     !H-         Nothalt aus
