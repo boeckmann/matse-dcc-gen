@@ -1,27 +1,21 @@
-//
-// Created by bernd on 28.05.18.
-//
-
-#include <stdint.h>
 #include "util.h"
+#include <ctype.h>
+#include <stdint.h>
 
-uint8_t two_digits_to_num(const char *digits)
+uint8_t str_to_uint8( const char **digits )
 {
-    return (uint8_t)((digits[0] - '0') * 10 + (digits[1] - '0'));
+    return (uint8_t)str_to_uint16( digits );
 }
 
-uint8_t three_digits_to_num(const char *digits)
+uint16_t str_to_uint16( const char **digits )
 {
-    return (uint8_t)((digits[0] - '0') * 100 + (digits[1] - '0') * 10 + (digits[2] - '0'));
-}
+    uint16_t v = 0;
+    const char *d = *digits;
 
-int8_t has_two_chars(const char *s)
-{
-    return (*s != 0) && (*(s + 1) != 0);
-}
+    while ( isdigit( *d ) ) {
+        v = v * 10 + *( d++ ) - '0';
+    }
+    *digits = d;
 
-int8_t has_three_chars(const char *s)
-{
-    return (*s != 0) && (*(s + 1) != 0) && (*(s + 2) != 0);
+    return v;
 }
-

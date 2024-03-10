@@ -1,21 +1,22 @@
-#include<avr/io.h>
-#include<avr/interrupt.h>
-#include<util/atomic.h>
-#include<util/delay.h>
+#include <avr/interrupt.h>
+#include <avr/io.h>
 #include <stddef.h>
-#include <string.h>
 #include <stdlib.h>
+#include <string.h>
+#include <util/atomic.h>
+#include <util/delay.h>
 
+#include "bitstream.h"
+#include "cmd.h"
+#include "serial.h"
+#include "ticks.h"
 #include "track.h"
 #include "train.h"
-#include "bitstream.h"
-#include "serial.h"
-#include "cmd.h"
+#include "version.h"
 
 #define DCC_DEBUG
 
-
-
+#if 0
 volatile uint16_t hiqhfreq_counter = 0;
 
 
@@ -25,45 +26,57 @@ void wait_ms(uint16_t delay)
     uint16_t end = hiqhfreq_counter + delay;
     while (hiqhfreq_counter != end);
 }
-
+#endif
 
 void avr_init()
 {
-    TCCR0A = (1<<WGM01); // CTC Modus
-    TCCR0B |= (1<<CS01); // Prescaler 8
+    TCCR0A = ( 1 << WGM01 ); // CTC Modus
+    TCCR0B |= ( 1 << CS01 ); // Prescaler 8
     OCR0A = 255;
-    TIMSK0 |= (1<<OCIE0A); // Compare Interrupt für Timer 0 erlauben
-    // 1000Hz counter initialisieren
-    // TCCR2A = (1<<WGM21);
-    // TCCR2B |= (1<<CS22);   // Prescaler 64
-    // OCR2A = 249;
-    // TIMSK2 |= (1<<OCIE2A);
+    TIMSK0 |= ( 1 << OCIE0A ); // Compare Interrupt für Timer 0 erlauben
+                               // 1000Hz counter initialisieren
+                               // TCCR2A = (1<<WGM21);
+                               // TCCR2B |= (1<<CS22);   // Prescaler 64
+                               // OCR2A = 249;
+                               // TIMSK2 |= (1<<OCIE2A);
 }
 
 static char cmd[16];
 
-int main(void)
+int main( void )
 {
+    uint8_t last_tick = ticks;
+
     avr_init();
     track_init();
 
-    serial_init(9600);
+    serial_init( 9600 );
 
-    sei();          // Global Interrupts aktivieren
+    sei(); // Global Interrupts aktivieren
 
-    serial_puts("READY\r\n");
+    serial_puts( version_string );
+    serial_puts( "\r\n" );
 
-    track_a_set_power( 1 );
+    track_set_power( main_track, 1 );
 
-    while(1) {
-
-        if (serial_recv_cmd(cmd, sizeof(cmd))) {
-            //serial_puts(cmd);
-            if (cmd_process(cmd)) {
-                serial_puts("?OK\r\n");
-            } else {
-                serial_puts("?ERR\r\n");
+    while ( 1 ) {
+        if ( serial_get_command( cmd, sizeof( cmd ) ) ) {
+            if ( *cmd ) { // Teste, ob Kommando nicht leer
+                if ( cmd_process( cmd ) ) {
+                    serial_puts( "?OK\r\n" );
+                }
+                else {
+                    serial_puts( "?ERR\r\n" );
+                }
             }
+        }
+        else {
+            serial_puts( "?ERR [transmission]\r\n" );
+        }
+
+        if ( (uint8_t)( ticks - last_tick ) > 100 ) {
+            // ca., wirklich ca. 500ms Intervall
+            last_tick = ticks;
         }
     }
 

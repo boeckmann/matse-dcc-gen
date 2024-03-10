@@ -1,10 +1,6 @@
-//
-// Created by bernd on 28.05.18.
-//
+#ifndef CMD_H
+#define CMD_H
 
-#ifndef RAIL03_CMD_H
-#define RAIL03_CMD_H
+int cmd_process( const char *cmd );
 
-int cmd_process(const char *cmd);
-
-#endif //RAIL03_CMD_H
+#endif // CMD_H

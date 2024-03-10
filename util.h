@@ -1,14 +1,9 @@
-//
-// Created by bernd on 28.05.18.
-//
+#ifndef UTIL_H
+#define UTIL_H
 
-#ifndef RAIL03_UTIL_H
-#define RAIL03_UTIL_H
+#include <stdint.h>
 
-uint8_t two_digits_to_num(const char *digits);
-uint8_t three_digits_to_num(const char *digits);
-int8_t has_two_chars(const char *s);
-int8_t has_three_chars(const char *s);
+uint8_t str_to_uint8( const char **digits );
+uint16_t str_to_uint16( const char **digits );
 
-
-#endif //RAIL03_UTIL_H
+#endif // UTIL_H
