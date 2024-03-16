@@ -27,11 +27,9 @@ int cmd_process( const char *cmd )
     }
     else if ( isdigit( *cmd ) ) { // Kommando für Zugadresse
         addr = str_to_uint16( &cmd );
-        if ( addr > 127 ) {
+        if ( addr > 10239 ) {
             return 0;
         }
-        // Lange Adressen noch nicht unterstützt
-        //if (addr > 10239) return 0;
         return cmd_train_process( addr, cmd );
     }
     else if ( *cmd == 'I' ) { // initialize and send version over serial
@@ -92,7 +90,7 @@ int cmd_train_dcc_mode( uint16_t addr, const char *cmd )
         return 0;
     }
 
-    if ( *cmd == '+' || *cmd == '0') { // 14 Fahrstufen
+    if ( *cmd == '+' || *cmd == '0' ) { // 14 Fahrstufen
         Train *train = train_by_addr( addr );
         train_set_dcc_mode( train, DCC_MODE_14 );
     }
@@ -102,7 +100,7 @@ int cmd_train_dcc_mode( uint16_t addr, const char *cmd )
     }
     else if ( *cmd == '2' ) {
         Train *train = train_by_addr( addr );
-        train_set_dcc_mode( train, DCC_MODE_128 );        
+        train_set_dcc_mode( train, DCC_MODE_128 );
     }
     else {
         return 0;

@@ -19,7 +19,6 @@ typedef struct Train {
     uint16_t addr;
     uint8_t speed;
     uint8_t direction;
-    uint8_t f0;
     uint8_t functions[9]; // Functions 0-68
 
     uint8_t active; // signal for train active

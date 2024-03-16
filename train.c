@@ -18,7 +18,6 @@ static BitStream estop_bitstream = { .length = 3,
 static BitStream idle_bitstream = { .length = 3,
                                     .data = { 0xff, 0x00, 0xff } };
 
-static void train_update_bitstream( Train *train );
 
 Train *train_new( uint16_t addr )
 {
@@ -49,23 +48,33 @@ Train *train_new( uint16_t addr )
     return train;
 }
 
+void train_gen_speed_bitstream( Train *train, BitStream *stream );
 void train_init_function_bitstream( Train *train, BitStream *stream,
                                     uint8_t data );
+
 
 Train *train_init( Train *train, uint16_t addr )
 {
     train->dcc_mode = DCC_MODE_28;
 
     train->addr = addr;
-    train->f0 = 0;
     train->speed = 0;
     train->direction = TRAIN_FORWARD;
     train->active = 0;
+    train->functions[0] = 0;
+    train->functions[1] = 0;
+    train->functions[2] = 0;
+    train->functions[3] = 0;
+    train->functions[4] = 0;
+    train->functions[5] = 0;
+    train->functions[6] = 0;
+    train->functions[7] = 0;
+    train->functions[8] = 0;
 
     train->curr_bitstream = 0;
     train->speed_stream.lock = 0;
 
-    train_update_bitstream( train );
+    train_gen_speed_bitstream( train, &train->speed_stream );
 
     train_init_function_bitstream( train, &train->f00_04_stream, 0x80 );
     train_init_function_bitstream( train, &train->f05_08_stream, 0xb0 );
@@ -87,29 +96,26 @@ void train_gen_speed_bitstream( Train *train, BitStream *stream )
     }
     else {
         stream->length = 4;
-        *data++ = 0xc0 | (train->addr >> 8);
+        *data++ = 0xc0 | ( train->addr >> 8 );
         *data++ = train->addr & 0xff;
     }
 
     // Geschwindigkeit und Richtung kodieren
     if ( train->dcc_mode == DCC_MODE_128 ) {
         *data++ = 0x3f;
-        *data = ((train->direction == TRAIN_FORWARD) ? 0x80 : 0) 
-              | ((train->speed > 0) ? train->speed + 1 : 0);
-
+        *data = ( ( train->direction == TRAIN_FORWARD ) ? 0x80 : 0 ) |
+                ( ( train->speed > 0 ) ? train->speed + 1 : 0 );
         stream->length++; // ein extra-Byte für 128 Fahrstufen
     }
     else {
-        *data = 0x40 | ((train->direction == TRAIN_FORWARD) ? 0x20 : 0);
+        *data = 0x40 | ( ( train->direction == TRAIN_FORWARD ) ? 0x20 : 0 );
         if ( train->dcc_mode == DCC_MODE_28 ) {
-            // 5. Geschwindigkeitsbit für 28 Fahrstufen
-            uint8_t spd = (train->speed > 0) ? train->speed + 3 : 0;
-            *data |= ((spd & 1) << 4) | (spd >> 1);
+            uint8_t spd = ( train->speed > 0 ) ? train->speed + 3 : 0;
+            *data |= ( ( spd & 1 ) << 4 ) | ( spd >> 1 );
         }
         else {
-            // F0 für DCC 14
-            *data |= ((train->speed > 0) ? train->speed + 1 : 0)
-                  | ((train->functions[0] & 1) ? 0x10 : 0);
+            *data |= ( ( train->speed > 0 ) ? train->speed + 1 : 0 ) |
+                     ( ( train->functions[0] & 1 ) ? 0x10 : 0 );
         }
     }
 
@@ -117,17 +123,13 @@ void train_gen_speed_bitstream( Train *train, BitStream *stream )
     stream->lock = 0;
 }
 
-void train_gen_func_bitstream( Train *train, BitStream *bitstream )
-{
-
-}
+void train_gen_func_bitstream( Train *train, BitStream *bitstream ) {}
 
 void train_gen_bitstream( Train *train, BitStream *stream, uint8_t which )
 {
     switch ( which ) {
     case 0: // Geschwindigkeit und Richtung
         train_gen_speed_bitstream( train, stream );
-   
     }
     bitstream_update_checksum( stream );
 }
@@ -156,13 +158,14 @@ void train_deactivate( Train *train )
 
 void train_enable_function( Train *train, uint8_t f )
 {
-    if ( f > 68 ) return;
-    train->functions[f >> 3] |= 1 << (f & 7);
+    if ( f > 68 ) {
+        return;
+    }
+    train->functions[f >> 3] |= 1 << ( f & 7 );
 
     if ( f == 0 ) {
-        train->f0 = 1;
         if ( train->dcc_mode == DCC_MODE_14 ) {
-            train_update_bitstream( train );
+            train_gen_speed_bitstream( train, &train->speed_stream );
         }
 
         train->f00_04_stream.data[1] |= 1 << 4;
@@ -184,13 +187,14 @@ void train_enable_function( Train *train, uint8_t f )
 
 void train_disable_function( Train *train, uint8_t f )
 {
-    if ( f > 68 ) return;
-    train->functions[f >> 3] &= ~(1 << (f & 7));
+    if ( f > 68 ) {
+        return;
+    }
+    train->functions[f >> 3] &= ~( 1 << ( f & 7 ) );
 
     if ( f == 0 ) {
-        train->f0 = 0;
         if ( train->dcc_mode == DCC_MODE_14 ) {
-            train_update_bitstream( train );
+            train_gen_speed_bitstream( train, &train->speed_stream );
         }
 
         train->f00_04_stream.data[1] &= ~( 1 << 4 );
@@ -213,7 +217,7 @@ void train_disable_function( Train *train, uint8_t f )
 void train_set_dcc_mode( Train *train, uint8_t dcc_mode )
 {
     train->dcc_mode = dcc_mode;
-    train_set_speed_and_dir( train, train->speed, train->direction );
+    train_set_speed_and_dir( train, 0, train->direction );
 }
 
 void train_set_speed_and_dir( Train *train, uint8_t speed, uint8_t dir )
@@ -315,36 +319,3 @@ BitStream *trains_schedule_next_bitstream()
     return train_schedule_next_bitstream( curr_train );
 }
 
-static void train_update_bitstream( Train *train )
-{
-    BitStream *stream = &train->speed_stream;
-
-    stream->length = 3;
-    stream->data[0] = train->addr;
-
-    uint8_t speed_and_dir = 0x40;
-    if ( train->direction ) {
-        speed_and_dir |= 0x20;
-    }
-
-    if ( train->dcc_mode == DCC_MODE_14 ) {
-        if ( train->speed > 0 ) {
-            speed_and_dir = speed_and_dir | ( train->speed + (uint8_t)1 );
-        }
-        if ( train->f0 ) {
-            speed_and_dir |= 0x10;
-        }
-    }
-    else {
-        if ( train->speed > 0 ) {
-            uint8_t spd = train->speed + (uint8_t)3;
-            speed_and_dir = speed_and_dir | (uint8_t)( ( spd & 0x1e ) >> 1 ) |
-                            (uint8_t)( ( spd & 1 ) << 4 );
-        }
-    }
-
-    stream->lock = 1;
-    stream->data[1] = speed_and_dir;
-    bitstream_update_checksum( stream );
-    stream->lock = 0;
-}
