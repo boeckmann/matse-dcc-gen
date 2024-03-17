@@ -21,6 +21,7 @@
 uint8_t main_track = 0; // Hauptgleis
 uint8_t prog_track = 1; // Programmiergleis
 
+
 void track_init( void )
 {
     DDRB |= PORTB_MASK;
@@ -35,6 +36,7 @@ void track_init( void )
     PORTB &= ~BRAKEA;
     PORTB &= ~BRAKEB;
 }
+
 
 void track_set_power( uint8_t track, uint8_t power )
 {
@@ -56,6 +58,7 @@ void track_set_power( uint8_t track, uint8_t power )
     }
 }
 
+
 void track_set_polarity( uint8_t track, uint8_t polarity )
 {
     if ( track == 0 ) { // Arduino Motor-Shield Ausgang A
@@ -75,6 +78,7 @@ void track_set_polarity( uint8_t track, uint8_t polarity )
         }
     }
 }
+
 
 void track_toggle_polarity( uint8_t track )
 {

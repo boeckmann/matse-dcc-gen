@@ -1,4 +1,4 @@
-#include "packet.h"
+#include "stream.h"
 #include "ticks.h"
 //#include "track.h"
 #include <avr/interrupt.h>
@@ -11,12 +11,13 @@
 
 typedef enum { FIRST_HALF, SECOND_HALF } PeriodState;
 
-typedef enum { SYNC, DATA_START, DATA } PacketState;
+typedef enum { SYNC, DATA_START, DATA } StreamState;
 
 typedef enum { BIT_ZERO, BIT_ONE } Bit;
 
 #define DIRA ( 1 << PORTB4 )
 #define DIRB ( 1 << PORTB5 )
+
 
 static inline void track_toggle_polarity( uint8_t track )
 {
@@ -39,11 +40,11 @@ ISR( TIMER0_COMPA_vect )
     static uint8_t data_bit_pos = 0;
     static uint8_t sync_bit_pos = 0;
 
-    static PacketState packet_state = SYNC;
+    static StreamState stream_state = SYNC;
     static Bit current_bit = BIT_ZERO;
     static PeriodState period_state = FIRST_HALF;
 
-    static Packet *pkt;
+    static Stream *stream;
     static uint8_t *data;
     static uint8_t data_bit_length;
 
@@ -63,17 +64,17 @@ ISR( TIMER0_COMPA_vect )
     if ( period_state == SECOND_HALF ) {
         period_state = FIRST_HALF;
 
-        switch ( packet_state ) {
+        switch ( stream_state ) {
         case SYNC:
             current_bit = BIT_ONE;
             if ( sync_bit_pos == NUM_SYNC_BITS - 1 ) {
-                packet_state = DATA_START;
+                stream_state = DATA_START;
                 sync_bit_pos = 0;
 
                 //PORTB ^= 1 << PORTB1; // Toggle input
-                pkt = schedule_next_packet();
-                data = pkt->data;
-                data_bit_length = pkt->length << 3;
+                stream = schedule_next_stream();
+                data = stream->data;
+                data_bit_length = stream->length << 3;
                 data_bit_pos = 0;
                 //PORTB ^= 1 << PORTB1; // Toggle input
             }
@@ -84,7 +85,7 @@ ISR( TIMER0_COMPA_vect )
 
         case DATA_START:
             current_bit = BIT_ZERO;
-            packet_state = DATA;
+            stream_state = DATA;
             break;
 
         case DATA:
@@ -102,11 +103,11 @@ ISR( TIMER0_COMPA_vect )
             // weiter mit Synchronisation, ansonsten Startbit (0) senden
             if ( ( data_bit_pos & 7 ) == 7 ) {
                 if ( data_bit_pos == ( data_bit_length - 1 ) ) {
-                    packet_state = SYNC;
+                    stream_state = SYNC;
                     ++ticks; // "Systemzeit" erhöhen
                 }
                 else {
-                    packet_state = DATA_START;
+                    stream_state = DATA_START;
                 }
             }
 

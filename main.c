@@ -7,8 +7,8 @@
 #include <util/delay.h>
 
 #include "cmd.h"
-#include "packet.h"
 #include "serial.h"
+#include "stream.h"
 #include "ticks.h"
 #include "track.h"
 #include "train.h"
@@ -16,17 +16,6 @@
 
 #define DCC_DEBUG
 
-#if 0
-volatile uint16_t hiqhfreq_counter = 0;
-
-
-void wait_ms(uint16_t delay)
-{
-    if (delay < 1) delay = 1;
-    uint16_t end = hiqhfreq_counter + delay;
-    while (hiqhfreq_counter != end);
-}
-#endif
 
 void avr_init()
 {
@@ -82,12 +71,3 @@ int main( void )
 
     return 0;
 }
-
-#if 0
-ISR (TIMER2_COMPA_vect)
-{
-    sei();  // Interrupts reaktivieren damit Signal-ISR
-            // nicht aus dem Tritt kommt
-    hiqhfreq_counter++;
-}
-#endif

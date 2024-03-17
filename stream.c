@@ -1,7 +1,7 @@
-#include "packet.h"
-#include "train.h"
-#include "track.h"
+#include "stream.h"
 #include "serial.h"
+#include "track.h"
+#include "train.h"
 #include <stddef.h>
 #include <util/atomic.h>
 
@@ -9,153 +9,164 @@ volatile uint8_t num_addresses_active = 0;
 
 int8_t estop = 0; // Nothalt
 
-static Packet estop_packet = { .length = 3, .data = { 0x00, 0x41, 0x41 } };
+static Stream estop_stream = { .length = 3, .data = { 0x00, 0x41, 0x41 } };
 
-static Packet estop128_packet = { .length = 4,
+static Stream estop128_stream = { .length = 4,
                                   .data = { 0x00, 0x3f, 0x81, 0xbe } };
 
-static Packet idle_packet = { .length = 3, .data = { 0xff, 0x00, 0xff } };
+static Stream idle_stream = { .length = 3, .data = { 0xff, 0x00, 0xff } };
 
-static Packet reset_packet = { .length = 3, .data = { 0xff, 0x00, 0xff } };
+static Stream reset_stream = { .length = 3, .data = { 0xff, 0x00, 0xff } };
 
 
 void activate_emergency_stop( int8_t stop ) { estop = stop; }
 
-void packet_request( uint8_t packet, uint8_t repeat, Train *train )
+void stream_request( uint8_t stream, uint8_t repeat, Train *train )
 {
-    ATOMIC_BLOCK( ATOMIC_RESTORESTATE )
-    {
-    }
+    ATOMIC_BLOCK( ATOMIC_RESTORESTATE ) {}
 }
 
-static void gen_speed_packet( Train *train, Packet *pkt );
-static void gen_function_packet( Train *train, Packet *pkt, int functions );
+static void gen_speed_stream( Train *train, Stream *stream );
+static void gen_function_stream( Train *train, Stream *stream,
+                                 int functions );
 
-void gen_train_packet( Train *train, Packet *pkt )
+void gen_train_stream( Train *train, Stream *stream )
 {
-    if ( train->stream == SPEED_AND_DIR ) {
-        return gen_speed_packet( train, pkt );
+    if ( train->stream_type == SPEED_AND_DIR ) {
+        return gen_speed_stream( train, stream );
     }
     else {
-        return gen_function_packet( train, pkt, train->stream );
+        return gen_function_stream( train, stream, train->stream_type );
     }
 }
+
 
 static void next_train_stream( Train *train )
 {
-    uint8_t *stream = &train->stream;
+    uint8_t *stream = &train->stream_type;
     uint8_t f_enabled = train->f_enabled;
 
     *stream += 1;
 
-    switch (*stream) {
+    switch ( *stream ) {
     case SPEED_AND_DIR:
     case FUNCTION_0_4:
     case FUNCTION_5_8:
-    case FUNCTION_9_12: return;
-    case FUNCTION_13_20: if (f_enabled & 0x01) { return; } *stream += 1;
-    case FUNCTION_21_28: if (f_enabled & 0x02) { return; } *stream += 1;
-    case FUNCTION_29_36: if (f_enabled & 0x04) { return; } *stream += 1;
-    case FUNCTION_37_44: if (f_enabled & 0x08) { return; } *stream += 1;
-    case FUNCTION_45_52: if (f_enabled & 0x10) { return; } *stream += 1;
-    case FUNCTION_53_60: if (f_enabled & 0x20) { return; } *stream += 1;
-    case FUNCTION_61_68: if (f_enabled & 0x40) { return; } *stream = SPEED_AND_DIR;
-    default: *stream = SPEED_AND_DIR;
+    case FUNCTION_9_12:
+        return;
+    case FUNCTION_13_20:
+        if ( f_enabled & 0x01 ) {
+            return;
+        }
+        *stream += 1;
+    case FUNCTION_21_28:
+        if ( f_enabled & 0x02 ) {
+            return;
+        }
+        *stream += 1;
+    case FUNCTION_29_36:
+        if ( f_enabled & 0x04 ) {
+            return;
+        }
+        *stream += 1;
+    case FUNCTION_37_44:
+        if ( f_enabled & 0x08 ) {
+            return;
+        }
+        *stream += 1;
+    case FUNCTION_45_52:
+        if ( f_enabled & 0x10 ) {
+            return;
+        }
+        *stream += 1;
+    case FUNCTION_53_60:
+        if ( f_enabled & 0x20 ) {
+            return;
+        }
+        *stream += 1;
+    case FUNCTION_61_68:
+        if ( f_enabled & 0x40 ) {
+            return;
+        }
+        *stream = SPEED_AND_DIR;
+    default:
+        *stream = SPEED_AND_DIR;
     }
 }
 
+
 // Läuft im Kontext der ISR
-Packet *schedule_next_packet()
+Stream *schedule_next_stream()
 {
     static uint8_t odd = 0;
-    static uint8_t packet_type = PACKET_IDLE;
-    static Packet packet;
+    static uint8_t stream_type = STREAM_IDLE;
+    static Stream stream;
     static Train *train = NULL;
 
     odd = ~odd; // markiert jedes zweite Datenpaket
 
     // Nothalt hat Priorität
     if ( estop ) {
-        return ( odd ) ? &estop_packet : &estop128_packet;
+        return ( odd ) ? &estop_stream : &estop128_stream;
     }
 
-#if 0
-    // Soll Paket "außer der Reihe" gesendet werden?
-    if ( requested_packet.repeat_count > 0 ) {
-        packet_type = requested_packet.type;
-        train = requested_packet.train;
-        requested_packet.repeat_count--;
-
-        // Scheduling überspringen und direkt Paket generieren, wenn
-        // Paketwiederholung ansteht
-        goto generate;
-    }
-
-    if ( packet_type == PACKET_RESET ) {
-        // Nach Rücksetzbefehl zunächst Idle Pakete senden
-        requested_packet.type = PACKET_IDLE;
-        requested_packet.repeat_count = 9; // Insgesamt 10 Idle Pakete
-        packet_type = PACKET_IDLE;
-        goto generate;
-    }
-#endif
     // Idle Kommando senden wenn keine Züge aktiv ist. Weiterhin jedes zweite
     // Paket als Idle Kommando senden wenn nur ein Zug aktiv ist, um 5ms
     // Zeitintervall zwischen den Paketen an die gleiche Adresse einzuhalten.
-    //if ( !num_trains_active || ( num_trains_active == 1 && odd ) ) {
-
-    if ( !num_addresses_active || (num_addresses_active == 1 && odd)) {
-        packet_type = PACKET_IDLE;
+    if ( !num_addresses_active || ( num_addresses_active == 1 && odd ) ) {
+        stream_type = STREAM_IDLE;
     }
     else {
-        packet_type = PACKET_TRAIN;
-        if (train == NULL) {
+        stream_type = STREAM_TRAIN;
+        if ( train == NULL ) {
             train = trains;
         }
         else {
             do {
                 train = train->next;
-            } while ( !train->active );            
+            } while ( !train->active );
         }
     }
 
-    switch ( packet_type ) {
-    case PACKET_RESET:
-        return &reset_packet;
-    case PACKET_TRAIN:
+    switch ( stream_type ) {
+    case STREAM_RESET:
+        return &reset_stream;
+    case STREAM_TRAIN:
         track_toggle_polarity( 1 );
-        gen_train_packet( train, &packet );
-        track_toggle_polarity( 1 );        
+        gen_train_stream( train, &stream );
+        track_toggle_polarity( 1 );
         next_train_stream( train );
-        return &packet;
+        return &stream;
     default:
-        return &idle_packet;
+        return &idle_stream;
     }
 }
 
-static inline void update_checksum( Packet *pkt )
+
+static inline void update_checksum( Stream *stream )
 {
     uint8_t i = 0;
     uint8_t checksum = 0;
 
-    for ( ; i < pkt->length - 1; i++ ) {
-        checksum ^= pkt->data[i];
+    for ( ; i < stream->length - 1; i++ ) {
+        checksum ^= stream->data[i];
     }
 
-    pkt->data[pkt->length - 1] = checksum;
+    stream->data[stream->length - 1] = checksum;
 }
 
-static void gen_speed_packet( Train *train, Packet *pkt )
+
+static void gen_speed_stream( Train *train, Stream *stream )
 {
-    uint8_t *data = pkt->data;
+    uint8_t *data = stream->data;
 
     // Zugaddresse kodieren
     if ( train->addr < 128 ) {
-        pkt->length = 3;
+        stream->length = 3;
         *data++ = train->addr;
     }
     else {
-        pkt->length = 4;
+        stream->length = 4;
         *data++ = 0xc0 | ( train->addr >> 8 );
         *data++ = train->addr & 0xff;
     }
@@ -165,7 +176,7 @@ static void gen_speed_packet( Train *train, Packet *pkt )
         *data++ = 0x3f;
         *data = ( ( train->direction == TRAIN_FORWARD ) ? 0x80 : 0 ) |
                 ( ( train->speed > 0 ) ? train->speed + 1 : 0 );
-        pkt->length++; // ein extra-Byte für 128 Fahrstufen
+        stream->length++; // ein extra-Byte für 128 Fahrstufen
     }
     else {
         *data = 0x40 | ( ( train->direction == TRAIN_FORWARD ) ? 0x20 : 0 );
@@ -179,21 +190,22 @@ static void gen_speed_packet( Train *train, Packet *pkt )
         }
     }
 
-    update_checksum( pkt );
+    update_checksum( stream );
 }
 
-static void gen_function_packet( Train *train, Packet *pkt, int functions )
+
+static void gen_function_stream( Train *train, Stream *stream, int functions )
 {
-    uint8_t *data = pkt->data;
+    uint8_t *data = stream->data;
     uint8_t fdata;
 
     // Zugaddresse kodieren
     if ( train->addr < 128 ) {
-        pkt->length = 3;
+        stream->length = 3;
         *data++ = train->addr;
     }
     else {
-        pkt->length = 4;
+        stream->length = 4;
         *data++ = 0xc0 | ( train->addr >> 8 );
         *data++ = train->addr & 0xff;
     }
@@ -218,51 +230,51 @@ static void gen_function_packet( Train *train, Packet *pkt, int functions )
                 ( ( train->functions[2] << 3 ) & 0xf8 );
         *data++ = 0xde;
         *data = fdata;
-        pkt->length++;
+        stream->length++;
         break;
     case FUNCTION_21_28: // Funktionen 21-28 codieren
         fdata = ( train->functions[2] >> 5 ) |
                 ( ( train->functions[3] << 3 ) & 0xf8 );
         *data++ = 0xdf;
         *data = fdata;
-        pkt->length++;
+        stream->length++;
         break;
     case FUNCTION_29_36:
         fdata = ( train->functions[3] >> 5 ) |
                 ( ( train->functions[4] << 3 ) & 0xf8 );
         *data++ = 0xd8;
         *data = fdata;
-        pkt->length++;
+        stream->length++;
         break;
     case FUNCTION_37_44:
         fdata = ( train->functions[4] >> 5 ) |
                 ( ( train->functions[5] << 3 ) & 0xf8 );
         *data++ = 0xd9;
         *data = fdata;
-        pkt->length++;
+        stream->length++;
         break;
     case FUNCTION_45_52:
         fdata = ( train->functions[5] >> 5 ) |
                 ( ( train->functions[6] << 3 ) & 0xf8 );
         *data++ = 0xda;
         *data = fdata;
-        pkt->length++;
+        stream->length++;
         break;
     case FUNCTION_53_60:
         fdata = ( train->functions[6] >> 5 ) |
                 ( ( train->functions[7] << 3 ) & 0xf8 );
         *data++ = 0xdb;
         *data = fdata;
-        pkt->length++;
+        stream->length++;
         break;
     case FUNCTION_61_68:
         fdata = ( train->functions[7] >> 5 ) |
                 ( ( train->functions[8] << 3 ) & 0xf8 );
         *data++ = 0xdc;
         *data = fdata;
-        pkt->length++;
+        stream->length++;
         break;
     }
 
-    update_checksum( pkt );
+    update_checksum( stream );
 }

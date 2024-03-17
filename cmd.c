@@ -1,6 +1,6 @@
 #include "cmd.h"
-#include "packet.h"
 #include "serial.h"
+#include "stream.h"
 #include "train.h"
 #include "util.h"
 #include "version.h"
@@ -14,6 +14,7 @@ int cmd_train_dcc_mode( uint16_t addr, const char *cmd );
 int cmd_train_activate( uint16_t addr, const char *cmd );
 int cmd_train_speed_and_dir( uint16_t addr, const char *cmd );
 int cmd_train_function( uint16_t addr, const char *cmd );
+
 
 int cmd_process( const char *cmd )
 {
@@ -42,6 +43,7 @@ int cmd_process( const char *cmd )
     return 0;
 }
 
+
 int cmd_emergency_stop( const char *cmd )
 {
     if ( *cmd == '+' ) {
@@ -56,6 +58,7 @@ int cmd_emergency_stop( const char *cmd )
 
     return 1;
 }
+
 
 int cmd_train_process( uint16_t addr, const char *cmd )
 {
@@ -84,6 +87,7 @@ int cmd_train_process( uint16_t addr, const char *cmd )
     return 0;
 }
 
+
 int cmd_train_dcc_mode( uint16_t addr, const char *cmd )
 {
     cmd++;
@@ -110,6 +114,7 @@ int cmd_train_dcc_mode( uint16_t addr, const char *cmd )
     return 1;
 }
 
+
 int cmd_train_activate( uint16_t addr, const char *cmd )
 {
     cmd++;
@@ -131,6 +136,7 @@ int cmd_train_activate( uint16_t addr, const char *cmd )
 
     return 1;
 }
+
 
 int cmd_train_speed_and_dir( uint16_t addr, const char *cmd )
 {
@@ -168,6 +174,7 @@ int cmd_train_speed_and_dir( uint16_t addr, const char *cmd )
     }
     return 0;
 }
+
 
 int cmd_train_function( uint16_t addr, const char *cmd )
 {

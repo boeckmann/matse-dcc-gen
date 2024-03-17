@@ -27,7 +27,7 @@ typedef struct Train {
     uint8_t direction;
     uint8_t functions[9]; // Functions 0-68
     uint8_t f_enabled;    // Welche Funktionspakete >F12 sind akiviert?
-    uint8_t stream;       // Welches Paket wird gesendet?
+    uint8_t stream_type;  // Welches Paket wird gesendet?
     uint8_t active;       // Generierung von Zugpaketen aktiviert?
     uint8_t dcc_mode;
 

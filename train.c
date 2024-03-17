@@ -1,11 +1,13 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
+
 #include <util/atomic.h>
 
-#include "packet.h"
-#include "train.h"
 #include "serial.h"
+#include "stream.h"
+#include "train.h"
 
 Train *trains = NULL;
 Train *last_train = NULL;
@@ -41,23 +43,13 @@ Train *train_new( uint16_t addr )
 
 Train *train_init( Train *train, uint16_t addr )
 {
-    train->dcc_mode = DCC_MODE_28;
+    memset( train, 0, sizeof( Train ) );
 
+    train->dcc_mode = DCC_MODE_28;
     train->addr = addr;
-    train->speed = 0;
     train->direction = TRAIN_FORWARD;
-    train->active = 0;
-    train->f_enabled = 0;
-    train->stream = SPEED_AND_DIR; // set to SPEED_AND_DIR on first scheduling
-    train->functions[0] = 0;
-    train->functions[1] = 0;
-    train->functions[2] = 0;
-    train->functions[3] = 0;
-    train->functions[4] = 0;
-    train->functions[5] = 0;
-    train->functions[6] = 0;
-    train->functions[7] = 0;
-    train->functions[8] = 0;
+    train->stream_type =
+        SPEED_AND_DIR; // set to SPEED_AND_DIR on first scheduling
 
     return train;
 }
@@ -92,7 +84,7 @@ void train_enable_function( Train *train, uint8_t f )
         // Aktiviere Ausgabe des Funktionspakets für Funktionen >12
         // 1. Bit = Funktionen 13-20, 2. Bit Funktionen 21-28 etc.
         // Funktionspakete für Funktionen 0-12 werden immer generiert.
-        train->f_enabled |= 1 << ((f - 13) >> 3);
+        train->f_enabled |= 1 << ( ( f - 13 ) >> 3 );
     }
     train_schedule_function( train, f );
 }
@@ -104,7 +96,7 @@ void train_disable_function( Train *train, uint8_t f )
     }
     train->functions[f >> 3] &= ~( 1 << ( f & 7 ) );
     if ( f > 12 ) {
-        train->f_enabled |= 1 << ((f - 13) >> 3);
+        train->f_enabled |= 1 << ( ( f - 13 ) >> 3 );
     }
     train_schedule_function( train, f );
 }
@@ -130,9 +122,7 @@ void train_set_speed_and_dir( Train *train, uint8_t speed, uint8_t dir )
     train->speed = speed;
     train->direction = dir;
 
-    train->stream = SPEED_AND_DIR;
-    // Drei Wiederholungen des Geschwindigkeitpakets "außer der Reihe" senden
-    //packet_request( SPEED_AND_DIR, 3, train );
+    train->stream_type = SPEED_AND_DIR;
 }
 
 Train *train_by_addr( uint16_t addr )
@@ -189,6 +179,5 @@ static void train_schedule_function( Train *train, uint8_t f )
         stream = FUNCTION_61_68;
     }
 
-    train->stream = stream;
-    //packet_request( request, 3, train );
+    train->stream_type = stream;
 }
