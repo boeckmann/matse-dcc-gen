@@ -7,15 +7,15 @@
 NAME=matse-dcc-gen
 DEVICE=atmega328p
 FREQ=16000000
-OBJS=main.o bitstream.o cmd.o isr_dcc.o serial.o ticks.o track.o train.o util.o version.o
+OBJS=main.o packet.o cmd.o isr_dcc.o serial.o ticks.o track.o train.o util.o version.o
 
 # programmer settings
-PORT?=/dev/cu.usbmodem101
+PORT?=/dev/cu.usbmodem1101
 BAUD?=115200
 PROGRAMMER=arduino
 
 # compiler and linker flags
-CFLAGS=-Os -std=c99 -Wall -mmcu=$(DEVICE) -DF_CPU=$(FREQ)UL
+CFLAGS=-Os -g -std=c99 -Wall -mmcu=$(DEVICE) -DF_CPU=$(FREQ)UL
 LFLAGS=-mmcu=$(DEVICE) -Wl,--gc-sections
 # the following is a fix for GCC>=12 bug https://gcc.gnu.org/bugzilla/show_bug.cgi?id=105523
 # uncomment for GCC>=12, GCC<=13.2 

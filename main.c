@@ -6,8 +6,8 @@
 #include <util/atomic.h>
 #include <util/delay.h>
 
-#include "bitstream.h"
 #include "cmd.h"
+#include "packet.h"
 #include "serial.h"
 #include "ticks.h"
 #include "track.h"

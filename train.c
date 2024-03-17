@@ -3,21 +3,12 @@
 #include <stdlib.h>
 #include <util/atomic.h>
 
-#include "bitstream.h"
+#include "packet.h"
 #include "train.h"
+#include "serial.h"
 
-Train *first_train = NULL;
+Train *trains = NULL;
 Train *last_train = NULL;
-Train *curr_train = NULL;
-
-static uint8_t num_trains_active = 0;
-int8_t trains_estop = 0;
-
-static BitStream estop_bitstream = { .length = 3,
-                                     .data = { 0x00, 0x41, 0x41 } };
-static BitStream idle_bitstream = { .length = 3,
-                                    .data = { 0xff, 0x00, 0xff } };
-
 
 Train *train_new( uint16_t addr )
 {
@@ -31,7 +22,7 @@ Train *train_new( uint16_t addr )
     if ( last_train ) {
         ATOMIC_BLOCK( ATOMIC_RESTORESTATE )
         {
-            train->next = first_train;
+            train->next = trains;
             last_train->next = train;
             last_train = train;
         }
@@ -40,17 +31,12 @@ Train *train_new( uint16_t addr )
         ATOMIC_BLOCK( ATOMIC_RESTORESTATE )
         {
             train->next = train;
-            first_train = last_train = train;
-            curr_train = first_train;
+            trains = last_train = train;
         }
     }
 
     return train;
 }
-
-void train_gen_speed_bitstream( Train *train, BitStream *stream );
-void train_init_function_bitstream( Train *train, BitStream *stream,
-                                    uint8_t data );
 
 
 Train *train_init( Train *train, uint16_t addr )
@@ -61,6 +47,8 @@ Train *train_init( Train *train, uint16_t addr )
     train->speed = 0;
     train->direction = TRAIN_FORWARD;
     train->active = 0;
+    train->f_enabled = 0;
+    train->stream = SPEED_AND_DIR; // set to SPEED_AND_DIR on first scheduling
     train->functions[0] = 0;
     train->functions[1] = 0;
     train->functions[2] = 0;
@@ -71,90 +59,28 @@ Train *train_init( Train *train, uint16_t addr )
     train->functions[7] = 0;
     train->functions[8] = 0;
 
-    train->curr_bitstream = 0;
-    train->speed_stream.lock = 0;
-
-    train_gen_speed_bitstream( train, &train->speed_stream );
-
-    train_init_function_bitstream( train, &train->f00_04_stream, 0x80 );
-    train_init_function_bitstream( train, &train->f05_08_stream, 0xb0 );
-    train_init_function_bitstream( train, &train->f09_12_stream, 0xa0 );
-
     return train;
 }
 
-void train_gen_speed_bitstream( Train *train, BitStream *stream )
-{
-    uint8_t *data = stream->data;
-
-    stream->lock = 1;
-
-    // Zugaddresse kodieren
-    if ( train->addr < 128 ) {
-        stream->length = 3;
-        *data++ = train->addr;
-    }
-    else {
-        stream->length = 4;
-        *data++ = 0xc0 | ( train->addr >> 8 );
-        *data++ = train->addr & 0xff;
-    }
-
-    // Geschwindigkeit und Richtung kodieren
-    if ( train->dcc_mode == DCC_MODE_128 ) {
-        *data++ = 0x3f;
-        *data = ( ( train->direction == TRAIN_FORWARD ) ? 0x80 : 0 ) |
-                ( ( train->speed > 0 ) ? train->speed + 1 : 0 );
-        stream->length++; // ein extra-Byte für 128 Fahrstufen
-    }
-    else {
-        *data = 0x40 | ( ( train->direction == TRAIN_FORWARD ) ? 0x20 : 0 );
-        if ( train->dcc_mode == DCC_MODE_28 ) {
-            uint8_t spd = ( train->speed > 0 ) ? train->speed + 3 : 0;
-            *data |= ( ( spd & 1 ) << 4 ) | ( spd >> 1 );
-        }
-        else {
-            *data |= ( ( train->speed > 0 ) ? train->speed + 1 : 0 ) |
-                     ( ( train->functions[0] & 1 ) ? 0x10 : 0 );
-        }
-    }
-
-    bitstream_update_checksum( stream );
-    stream->lock = 0;
-}
-
-void train_gen_func_bitstream( Train *train, BitStream *bitstream ) {}
-
-void train_gen_bitstream( Train *train, BitStream *stream, uint8_t which )
-{
-    switch ( which ) {
-    case 0: // Geschwindigkeit und Richtung
-        train_gen_speed_bitstream( train, stream );
-    }
-    bitstream_update_checksum( stream );
-}
-
-void train_init_function_bitstream( Train *train, BitStream *stream,
-                                    uint8_t data )
-{
-    stream->length = 3;
-    stream->data[0] = train->addr;
-    stream->data[1] = data;
-    stream->data[2] = train->addr ^ data;
-    stream->lock = 0;
-}
 
 void train_activate( Train *train )
 {
-    train->active = 1;
-    num_trains_active++;
+    if ( !train->active ) {
+        train->active = 1;
+        num_addresses_active++;
+    }
 }
 
 void train_deactivate( Train *train )
 {
-    num_trains_active--;
-    train->active = 0;
+    if ( train->active ) {
+        num_addresses_active--;
+        train->active = 0;
+    }
 }
+
+
+static void train_schedule_function( Train *train, uint8_t f );
 
 void train_enable_function( Train *train, uint8_t f )
 {
@@ -162,27 +88,13 @@ void train_enable_function( Train *train, uint8_t f )
         return;
     }
     train->functions[f >> 3] |= 1 << ( f & 7 );
-
-    if ( f == 0 ) {
-        if ( train->dcc_mode == DCC_MODE_14 ) {
-            train_gen_speed_bitstream( train, &train->speed_stream );
-        }
-
-        train->f00_04_stream.data[1] |= 1 << 4;
-        bitstream_update_checksum( &train->f00_04_stream );
+    if ( f > 12 ) {
+        // Aktiviere Ausgabe des Funktionspakets für Funktionen >12
+        // 1. Bit = Funktionen 13-20, 2. Bit Funktionen 21-28 etc.
+        // Funktionspakete für Funktionen 0-12 werden immer generiert.
+        train->f_enabled |= (f - 13) >> 3;
     }
-    else if ( f < 5 ) {
-        train->f00_04_stream.data[1] |= 1 << ( f - 1 );
-        bitstream_update_checksum( &train->f00_04_stream );
-    }
-    else if ( f < 9 ) {
-        train->f05_08_stream.data[1] |= 1 << ( f - 5 );
-        bitstream_update_checksum( &train->f05_08_stream );
-    }
-    else if ( f < 13 ) {
-        train->f09_12_stream.data[1] |= 1 << ( f - 9 );
-        bitstream_update_checksum( &train->f09_12_stream );
-    }
+    train_schedule_function( train, f );
 }
 
 void train_disable_function( Train *train, uint8_t f )
@@ -191,27 +103,10 @@ void train_disable_function( Train *train, uint8_t f )
         return;
     }
     train->functions[f >> 3] &= ~( 1 << ( f & 7 ) );
-
-    if ( f == 0 ) {
-        if ( train->dcc_mode == DCC_MODE_14 ) {
-            train_gen_speed_bitstream( train, &train->speed_stream );
-        }
-
-        train->f00_04_stream.data[1] &= ~( 1 << 4 );
-        bitstream_update_checksum( &train->f00_04_stream );
+    if ( f > 12 ) {
+        train->f_enabled |= (f - 13) >> 3;
     }
-    else if ( f < 5 ) {
-        train->f00_04_stream.data[1] &= ~( 1 << ( f - 1 ) );
-        bitstream_update_checksum( &train->f00_04_stream );
-    }
-    else if ( f < 9 ) {
-        train->f05_08_stream.data[1] &= ~( 1 << ( f - 5 ) );
-        bitstream_update_checksum( &train->f05_08_stream );
-    }
-    else if ( f < 13 ) {
-        train->f09_12_stream.data[1] &= ~( 1 << ( f - 9 ) );
-        bitstream_update_checksum( &train->f09_12_stream );
-    }
+    train_schedule_function( train, f );
 }
 
 void train_set_dcc_mode( Train *train, uint8_t dcc_mode )
@@ -235,12 +130,14 @@ void train_set_speed_and_dir( Train *train, uint8_t speed, uint8_t dir )
     train->speed = speed;
     train->direction = dir;
 
-    train_gen_speed_bitstream( train, &train->speed_stream );
+    train->stream = SPEED_AND_DIR;
+    // Drei Wiederholungen des Geschwindigkeitpakets "außer der Reihe" senden
+    //packet_request( SPEED_AND_DIR, 3, train );
 }
 
 Train *train_by_addr( uint16_t addr )
 {
-    Train *train = first_train;
+    Train *train = trains;
 
     if ( train == NULL ) {
         return train_new( addr );
@@ -252,70 +149,46 @@ Train *train_by_addr( uint16_t addr )
         }
         train = train->next;
 
-    } while ( train != first_train );
+    } while ( train != trains );
 
     return train_new( addr );
 }
 
-void trains_emergency_stop( int8_t stop ) { trains_estop = stop; }
-
-// Läuft im Kontext der ISR
-BitStream *train_schedule_next_bitstream( Train *train )
+static void train_schedule_function( Train *train, uint8_t f )
 {
-    BitStream *next_stream;
+    uint8_t stream;
 
-try_next:
-    switch ( train->curr_bitstream ) {
-    case 0:
-        train->curr_bitstream++;
-        next_stream = &train->speed_stream;
-        break;
-    case 1:
-        train->curr_bitstream++;
-        next_stream = &train->f00_04_stream;
-        break;
-    case 2:
-        train->curr_bitstream++;
-        next_stream = &train->f05_08_stream;
-        break;
-    case 3:
-        train->curr_bitstream = 0;
-        next_stream = &train->f09_12_stream;
-        break;
-    default:
-        train->curr_bitstream = 0;
-        next_stream = &train->speed_stream;
+    if ( f < 5 ) {
+        stream = FUNCTION_0_4;
     }
-    // Wird Bitstream gerade aktualisiert? Dann einen anderen wählen!
-    if ( next_stream->lock ) {
-        goto try_next;
+    else if ( f < 9 ) {
+        stream = FUNCTION_5_8;
+    }
+    else if ( f < 13 ) {
+        stream = FUNCTION_9_12;
+    }
+    else if ( f < 21 ) {
+        stream = FUNCTION_13_20;
+    }
+    else if ( f < 29 ) {
+        stream = FUNCTION_21_28;
+    }
+    else if ( f < 37 ) {
+        stream = FUNCTION_29_36;
+    }
+    else if ( f < 45 ) {
+        stream = FUNCTION_37_44;
+    }
+    else if ( f < 53 ) {
+        stream = FUNCTION_45_52;
+    }
+    else if ( f < 61 ) {
+        stream = FUNCTION_53_60;
+    }
+    else {
+        stream = FUNCTION_61_68;
     }
 
-    return next_stream;
+    train->stream = stream;
+    //packet_request( request, 3, train );
 }
-
-// Läuft im Kontext der ISR
-BitStream *trains_schedule_next_bitstream()
-{
-    static int odd = 0;
-
-    odd ^= 1; // markiert jedes zweite Datenpaket
-
-    if ( trains_estop ) {
-        return &estop_bitstream;
-    }
-
-    // Idle Kommando senden wenn keine Züge aktiv ist. Weiterhin jedes zweite
-    // Paket als Idle Kommando senden wenn nur ein Zug aktiv ist, um 5ms
-    // Zeitintervall zwischen den Paketen an die gleiche Adresse einzuhalten.
-    if ( !num_trains_active || ( num_trains_active == 1 && odd ) ) {
-        return &idle_bitstream;
-    }
-
-    do {
-        curr_train = curr_train->next;
-    } while ( !curr_train->active );
-
-    return train_schedule_next_bitstream( curr_train );
-}
-

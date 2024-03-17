@@ -1,4 +1,5 @@
 #include "cmd.h"
+#include "packet.h"
 #include "serial.h"
 #include "train.h"
 #include "util.h"
@@ -44,10 +45,10 @@ int cmd_process( const char *cmd )
 int cmd_emergency_stop( const char *cmd )
 {
     if ( *cmd == '+' ) {
-        trains_emergency_stop( 1 );
+        activate_emergency_stop( 1 );
     }
     else if ( *cmd == '-' ) {
-        trains_emergency_stop( 0 );
+        activate_emergency_stop( 0 );
     }
     else {
         return 0;
