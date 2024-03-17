@@ -1,5 +1,6 @@
 #include "packet.h"
 #include "train.h"
+#include "serial.h"
 #include <stddef.h>
 #include <util/atomic.h>
 
@@ -42,7 +43,7 @@ void gen_train_packet( Train *train, Packet *pkt )
 static void next_train_stream( Train *train )
 {
 again:
-    if ( train->stream == FUNCTION_61_68 ) {
+    if ( train->stream >= FUNCTION_61_68 ) {
         train->stream = SPEED_AND_DIR;
         return;
     }
@@ -50,11 +51,10 @@ again:
     train->stream++;
 
     if ( train->stream >= FUNCTION_13_20 ) {
-        serial_puts("x");
-        goto again;
-//        if ( !(train->f_enabled & (1 << (train->stream - FUNCTION_13_20) ))) {
-//            goto again;
-//        }
+        // Funktionen >= 13 nur senden wenn nötig
+        if ( !(train->f_enabled & (1 << (train->stream - FUNCTION_13_20) ))) {
+            goto again;
+        }
     }
 }
 
@@ -103,9 +103,14 @@ Packet *schedule_next_packet()
     }
     else {
         packet_type = PACKET_TRAIN;
-        do {
-            train = train->next;
-        } while ( !train->active );
+        if (train == NULL) {
+            train = trains;
+        }
+        else {
+            do {
+                train = train->next;
+            } while ( !train->active );            
+        }
     }
 
     switch ( packet_type ) {
@@ -114,7 +119,7 @@ Packet *schedule_next_packet()
     case PACKET_TRAIN:
         gen_train_packet( train, &packet );
         next_train_stream( train );
-        return &idle_packet;
+        return &packet;
     default:
         return &idle_packet;
     }
