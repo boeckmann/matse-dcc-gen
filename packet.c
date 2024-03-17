@@ -1,5 +1,6 @@
 #include "packet.h"
 #include "train.h"
+#include "track.h"
 #include "serial.h"
 #include <stddef.h>
 #include <util/atomic.h>
@@ -42,19 +43,24 @@ void gen_train_packet( Train *train, Packet *pkt )
 
 static void next_train_stream( Train *train )
 {
-again:
-    if ( train->stream >= FUNCTION_61_68 ) {
-        train->stream = SPEED_AND_DIR;
-        return;
-    }
+    uint8_t *stream = &train->stream;
+    uint8_t f_enabled = train->f_enabled;
 
-    train->stream++;
+    *stream += 1;
 
-    if ( train->stream >= FUNCTION_13_20 ) {
-        // Funktionen >= 13 nur senden wenn nötig
-        if ( !(train->f_enabled & (1 << (train->stream - FUNCTION_13_20) ))) {
-            goto again;
-        }
+    switch (*stream) {
+    case SPEED_AND_DIR:
+    case FUNCTION_0_4:
+    case FUNCTION_5_8:
+    case FUNCTION_9_12: return;
+    case FUNCTION_13_20: if (f_enabled & 0x01) { return; } *stream += 1;
+    case FUNCTION_21_28: if (f_enabled & 0x02) { return; } *stream += 1;
+    case FUNCTION_29_36: if (f_enabled & 0x04) { return; } *stream += 1;
+    case FUNCTION_37_44: if (f_enabled & 0x08) { return; } *stream += 1;
+    case FUNCTION_45_52: if (f_enabled & 0x10) { return; } *stream += 1;
+    case FUNCTION_53_60: if (f_enabled & 0x20) { return; } *stream += 1;
+    case FUNCTION_61_68: if (f_enabled & 0x40) { return; } *stream = SPEED_AND_DIR;
+    default: *stream = SPEED_AND_DIR;
     }
 }
 
@@ -117,7 +123,9 @@ Packet *schedule_next_packet()
     case PACKET_RESET:
         return &reset_packet;
     case PACKET_TRAIN:
+        track_toggle_polarity( 1 );
         gen_train_packet( train, &packet );
+        track_toggle_polarity( 1 );        
         next_train_stream( train );
         return &packet;
     default:
