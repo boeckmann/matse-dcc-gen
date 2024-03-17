@@ -92,7 +92,7 @@ void train_enable_function( Train *train, uint8_t f )
         // Aktiviere Ausgabe des Funktionspakets für Funktionen >12
         // 1. Bit = Funktionen 13-20, 2. Bit Funktionen 21-28 etc.
         // Funktionspakete für Funktionen 0-12 werden immer generiert.
-        train->f_enabled |= (f - 13) >> 3;
+        train->f_enabled |= 1 << ((f - 13) >> 3);
     }
     train_schedule_function( train, f );
 }
@@ -104,7 +104,7 @@ void train_disable_function( Train *train, uint8_t f )
     }
     train->functions[f >> 3] &= ~( 1 << ( f & 7 ) );
     if ( f > 12 ) {
-        train->f_enabled |= (f - 13) >> 3;
+        train->f_enabled |= 1 << ((f - 13) >> 3);
     }
     train_schedule_function( train, f );
 }
