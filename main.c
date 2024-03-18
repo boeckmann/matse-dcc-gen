@@ -35,8 +35,10 @@ static char cmd[16];
 int main( void )
 {
     uint8_t last_tick = ticks;
+    int t;
 
     avr_init();
+    tick_counter_init();
     track_init();
 
     serial_init( 9600 );
@@ -45,6 +47,18 @@ int main( void )
 
     serial_puts( version_string );
     serial_puts( "\r\n" );
+
+#if 0
+    // Testen, wie viele Züge definiert werden können (Arbeitsspeicherlimit)
+    for ( t = 1; t <= 80; t++ ) {
+        if ( !train_by_addr( t ) ) {
+            serial_puts( "allocation error\r\n" );
+        }
+        else {
+            train_activate( train_by_addr( 1 ) );
+        }
+    }
+#endif
 
     track_set_power( main_track, 1 );
 

@@ -20,7 +20,8 @@ typedef struct {
 
 extern volatile uint8_t num_addresses_active;
 
-Stream *schedule_next_stream();
+void plan_next_stream( void );
+Stream *build_next_stream( void );
 void activate_emergency_stop( int8_t stop );
 
 #endif // STREAM_H

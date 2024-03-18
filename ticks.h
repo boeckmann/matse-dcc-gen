@@ -11,4 +11,6 @@
 // ca. 5ms für ein drei-Byte Datenpaket
 extern volatile uint8_t ticks;
 
+void tick_counter_init( void );
+
 #endif

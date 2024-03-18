@@ -5,7 +5,7 @@
 #include "ticks.h"
 #include <util/setbaud.h>
 
-#define SERIAL_TIMEOUT 250 // Anzahl an Ticks bis Timeout
+#define SERIAL_TIMEOUT 200 // Anzahl an Ticks bis Timeout (2s)
 
 void serial_init( unsigned int baudrate )
 {
@@ -16,6 +16,7 @@ void serial_init( unsigned int baudrate )
     UCSR0C = ( 3 << UCSZ00 );
 }
 
+
 void serial_putc( char data )
 {
     while ( !( UCSR0A & ( 1 << UDRE0 ) ) )
@@ -23,12 +24,14 @@ void serial_putc( char data )
     UDR0 = (uint8_t)data;
 }
 
+
 void serial_puts( char *data )
 {
     while ( *data ) {
         serial_putc( *data++ );
     }
 }
+
 
 int serial_getc( char *data, uint8_t timeout )
 {
@@ -51,7 +54,9 @@ int serial_getc( char *data, uint8_t timeout )
     return 1;
 }
 
+
 int serial_data_available( void ) { return UCSR0A & ( 1 << RXC0 ); }
+
 
 // Liest ein (möglicherweise leeres Kommando) ein. Sollte das erste Byte
 // kein Kommandostartbyte '!' sein, wird ein leeres Kommando und Erfolg

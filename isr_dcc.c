@@ -58,6 +58,8 @@ ISR( TIMER0_COMPA_vect )
         OCR0A = LONG_PULSE; // Null/Bit
     }
 
+    sei();
+
     track_toggle_polarity( 0 ); // Gleis umpolarisieren
 
     // Ab hier Statusmaschine zur Bestimmung des nächsten Bit
@@ -67,12 +69,16 @@ ISR( TIMER0_COMPA_vect )
         switch ( stream_state ) {
         case SYNC:
             current_bit = BIT_ONE;
-            if ( sync_bit_pos == NUM_SYNC_BITS - 1 ) {
+            if ( sync_bit_pos == NUM_SYNC_BITS - 2 ) {
+                plan_next_stream();
+                sync_bit_pos++;
+            }
+            else if ( sync_bit_pos == NUM_SYNC_BITS - 1 ) {
                 stream_state = DATA_START;
                 sync_bit_pos = 0;
 
                 //PORTB ^= 1 << PORTB1; // Toggle input
-                stream = schedule_next_stream();
+                stream = build_next_stream();
                 data = stream->data;
                 data_bit_length = stream->length << 3;
                 data_bit_pos = 0;
@@ -104,7 +110,9 @@ ISR( TIMER0_COMPA_vect )
             if ( ( data_bit_pos & 7 ) == 7 ) {
                 if ( data_bit_pos == ( data_bit_length - 1 ) ) {
                     stream_state = SYNC;
+#if 0
                     ++ticks; // "Systemzeit" erhöhen
+#endif
                 }
                 else {
                     stream_state = DATA_START;

@@ -41,7 +41,7 @@ void gen_train_stream( Train *train, Stream *stream )
 }
 
 
-static void next_train_stream( Train *train )
+static void plan_next_train_stream( Train *train )
 {
     uint8_t *stream = &train->stream_type;
     uint8_t f_enabled = train->f_enabled;
@@ -94,15 +94,13 @@ static void next_train_stream( Train *train )
     }
 }
 
+static uint8_t stream_type = STREAM_IDLE;
+static Train *train = NULL;
+static uint8_t odd = 0;
 
 // Läuft im Kontext der ISR
-Stream *schedule_next_stream()
+void plan_next_stream( void )
 {
-    static uint8_t odd = 0;
-    static uint8_t stream_type = STREAM_IDLE;
-    static Stream stream;
-    static Train *train = NULL;
-
     odd = ~odd; // markiert jedes zweite Datenpaket
 
     // Nothalt hat Priorität
@@ -127,15 +125,18 @@ Stream *schedule_next_stream()
             } while ( !train->active );
         }
     }
+}
+
+
+Stream *build_next_stream( void ) {
+    static Stream stream;
 
     switch ( stream_type ) {
     case STREAM_RESET:
         return &reset_stream;
     case STREAM_TRAIN:
-        track_toggle_polarity( 1 );
         gen_train_stream( train, &stream );
-        track_toggle_polarity( 1 );
-        next_train_stream( train );
+        plan_next_train_stream( train );
         return &stream;
     default:
         return &idle_stream;
