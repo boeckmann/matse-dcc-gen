@@ -5,14 +5,18 @@
 #include <stddef.h>
 #include <util/atomic.h>
 
+volatile uint8_t repeated_stream_count = 0;  // Anzahl an Wiederholungen für aktuellen Stream
+uint8_t repeated_stream_type;
+Train *repeated_stream_train = NULL;
+
 volatile uint8_t num_addresses_active = 0;
 
 int8_t estop = 0; // Nothalt
 
-static Stream estop_stream = { .length = 3, .data = { 0x00, 0x41, 0x41 } };
+static Stream estop_stream = { .length = 3, .data = { 0x00, 0x01, 0x01 } };
 
 static Stream estop128_stream = { .length = 4,
-                                  .data = { 0x00, 0x3f, 0x81, 0xbe } };
+                                  .data = { 0x00, 0x3f, 0x01, 0x3e } };
 
 static Stream idle_stream = { .length = 3, .data = { 0xff, 0x00, 0xff } };
 
@@ -95,34 +99,43 @@ static void plan_next_train_stream( Train *train )
 }
 
 static uint8_t stream_type = STREAM_IDLE;
-static Train *train = NULL;
-static uint8_t odd = 0;
+static Train *stream_train = NULL;
+static uint8_t stream_odd = 0;
 
 // Läuft im Kontext der ISR
 void plan_next_stream( void )
 {
-    odd = ~odd; // markiert jedes zweite Datenpaket
+    stream_odd = ~stream_odd; // markiert jedes zweite Datenpaket
 
     // Nothalt hat Priorität
     if ( estop ) {
-        return ( odd ) ? &estop_stream : &estop128_stream;
+        stream_type = ( stream_odd ) ? STREAM_ESTOP : STREAM_ESTOP128;
+        return;
+    }
+
+    // Aktueller Stream soll wiederholt werden
+    if ( repeated_stream_count > 0 ) {
+        stream_type = repeated_stream_type;
+        stream_train = repeated_stream_train;
+        repeated_stream_count--;
+        return;
     }
 
     // Idle Kommando senden wenn keine Züge aktiv ist. Weiterhin jedes zweite
     // Paket als Idle Kommando senden wenn nur ein Zug aktiv ist, um 5ms
     // Zeitintervall zwischen den Paketen an die gleiche Adresse einzuhalten.
-    if ( !num_addresses_active || ( num_addresses_active == 1 && odd ) ) {
+    if ( !num_addresses_active || ( num_addresses_active == 1 && stream_odd ) ) {
         stream_type = STREAM_IDLE;
     }
     else {
         stream_type = STREAM_TRAIN;
-        if ( train == NULL ) {
-            train = trains;
+        if ( stream_train == NULL ) {
+            stream_train = trains;
         }
         else {
             do {
-                train = train->next;
-            } while ( !train->active );
+                stream_train = stream_train->next;
+            } while ( !stream_train->active );
         }
     }
 }
@@ -135,9 +148,11 @@ Stream *build_next_stream( void ) {
     case STREAM_RESET:
         return &reset_stream;
     case STREAM_TRAIN:
-        gen_train_stream( train, &stream );
-        plan_next_train_stream( train );
+        gen_train_stream( stream_train, &stream );
+        plan_next_train_stream( stream_train );
         return &stream;
+    case STREAM_ESTOP: return &estop_stream;
+    case STREAM_ESTOP128: return &estop128_stream;
     default:
         return &idle_stream;
     }

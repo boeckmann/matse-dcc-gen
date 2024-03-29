@@ -110,9 +110,6 @@ ISR( TIMER0_COMPA_vect )
             if ( ( data_bit_pos & 7 ) == 7 ) {
                 if ( data_bit_pos == ( data_bit_length - 1 ) ) {
                     stream_state = SYNC;
-#if 0
-                    ++ticks; // "Systemzeit" erhöhen
-#endif
                 }
                 else {
                     stream_state = DATA_START;
