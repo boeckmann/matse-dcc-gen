@@ -57,9 +57,9 @@ Im folgenden Beispiel wird die Generierung des Signals für Lokadresse 1 aktivie
 
 
 ## Paket-Scheduling
-Der Generator gibt kontinuierlich ein DCC Signal aus. Sollte keine Lokadresse aktiv sein werden zur Aufrechterhaltung der Stromversorgung DCC Idle-Pakete ausgegeben. Sollten Lokadressen aktiv sein werden die Pakete für Geschwindigkeit und Funktionen 0-12 in regelmäßigen Abständen wiederholt. Dies geschieht für alle Lokadressen alternierend (gleichberechtigt). Wenn Änderungen an den Fahrstufen oder Funktionen mittels serieller Schnittstelle (USB) eingehen, werden die daraus resultierenden DCC Pakete außer der Reihe und mehrmals wiederholt gesendet. Ziel ist, dass die Empfängerlok die Information a) so schnell wie möglich und b) möglichst zuverlässig empfängt.
+Der Generator gibt kontinuierlich ein DCC Signal aus. Sollte keine Lokadresse aktiv sein werden zur Aufrechterhaltung der Stromversorgung DCC Idle-Pakete ausgegeben. Sollten Lokadressen aktiv sein werden die Pakete für Geschwindigkeit und Funktionen 0-12 in regelmäßigen Abständen wiederholt. Dies geschieht für alle aktiven Lokadressen alternierend, also gleichberechtigt. Wenn Änderungen an den Fahrstufen oder Funktionen mittels serieller Schnittstelle (USB) eingehen, werden die daraus resultierenden DCC Pakete außer der Reihe und mehrmals wiederholt gesendet. Ziel ist, dass die Empfängerlok die Information a) so schnell wie möglich und b) möglichst zuverlässig empfängt.
 
-Die Funktionen 0-12 jeder aktivierten Lokadresse werden kontinuierlich gesendet. Dies ist bei den Funktionen 13-68 aus Optimierungsgründen anders. Das kontinuierliche Senden dieser Funktionen für eine spezifische Lokadresse wird nur aktiviert, nachdem ein Kommando zum Setzen oder Rücksetzen für eine Funktion dieser Funktionen eingegangen ist.
+Die Funktionen 0-12 jeder aktivierten Lokadresse werden kontinuierlich gesendet. Dies ist bei den Funktionen 13-68 aus Optimierungsgründen anders. Das kontinuierliche Senden dieser Funktionen für eine spezifische Lokadresse wird nur aktiviert, nachdem ein Kommando zum Setzen oder Rücksetzen für eine dieser Funktionen eingegangen ist.
 
 
 ## Hinweis zum Arduino Motor-Shield
@@ -73,5 +73,5 @@ muss der Hinweis im Makefile beachtet werden! Zum Bauen des Programms sollte
 bei korrekt eingerichtetem ACR-GCC Toolchain ein simples `make` im
 Projektverzeichnis genügen. Das Programm kann mit `make upload PORT=... BAUD=...`
 auf den Arduino geladen werden. Dies setzt ein installiertes avrdude Programm
-voraus. PORT und BAUD (standardmäßig 9600) müssen entsprechend der Seriellen
+voraus. PORT und BAUD (standardmäßig 115200) müssen entsprechend der Seriellen
 Schnittstelle angepasst werden.
