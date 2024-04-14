@@ -124,10 +124,12 @@ void train_set_speed_and_dir( Train *train, uint8_t speed, uint8_t dir )
 
     train->stream_type = SPEED_AND_DIR;
 
-    repeated_stream_count = 0;  // prevent ISR from reading train and type
-    repeated_stream_type = STREAM_TRAIN;
-    repeated_stream_train = train;
-    repeated_stream_count = DEFAULT_STREAM_REPITITIONS;
+    if ( train->active ) {
+        repeated_stream_count = 0;  // prevent ISR from reading train and type
+        repeated_stream_type = STREAM_TRAIN;
+        repeated_stream_train = train;
+        repeated_stream_count = DEFAULT_STREAM_REPITITIONS;
+    }
 }
 
 Train *train_by_addr( uint16_t addr )
@@ -186,8 +188,10 @@ static void train_schedule_function( Train *train, uint8_t f )
 
     train->stream_type = stream;
 
-    repeated_stream_count = 0;  // prevent ISR from reading train and type
-    repeated_stream_type = STREAM_TRAIN;
-    repeated_stream_train = train;
-    repeated_stream_count = DEFAULT_STREAM_REPITITIONS;
+    if ( train->active ) {
+        repeated_stream_count = 0;  // prevent ISR from reading train and type
+        repeated_stream_type = STREAM_TRAIN;
+        repeated_stream_train = train;
+        repeated_stream_count = DEFAULT_STREAM_REPITITIONS;
+    }
 }
