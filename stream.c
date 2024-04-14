@@ -13,7 +13,7 @@ volatile uint8_t num_addresses_active = 0;
 
 int8_t estop = 0; // Nothalt
 
-static Stream estop_stream = { .length = 3, .data = { 0x00, 0x01, 0x01 } };
+static Stream estop_stream =  { .length = 3, .data = { 0x00, 0x41, 0x41 } };
 
 static Stream estop128_stream = { .length = 4,
                                   .data = { 0x00, 0x3f, 0x01, 0x3e } };
