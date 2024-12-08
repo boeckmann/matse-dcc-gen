@@ -2,6 +2,7 @@
 #include "serial.h"
 #include "stream.h"
 #include "train.h"
+#include "track.h"
 #include "util.h"
 #include "version.h"
 #include <ctype.h>
@@ -9,6 +10,7 @@
 #include <string.h>
 
 int cmd_emergency_stop( const char *cmd );
+int cmd_track_power( const char *cmd );
 int cmd_train_process( uint16_t addr, const char *cmd );
 int cmd_train_dcc_mode( uint16_t addr, const char *cmd );
 int cmd_train_activate( uint16_t addr, const char *cmd );
@@ -26,6 +28,9 @@ int cmd_process( const char *cmd )
 
     if ( *cmd == 'H' ) { // NOTHALT
         return cmd_emergency_stop( cmd + 1 );
+    }
+    else if ( *cmd == 'P' ) { // TRACK POWER
+        return cmd_track_power( cmd + 1 );
     }
     else if ( isdigit( *cmd ) ) { // Kommando für Zugadresse
         addr = str_to_uint16( &cmd );
@@ -51,6 +56,22 @@ int cmd_emergency_stop( const char *cmd )
     }
     else if ( *cmd == '-' ) {
         activate_emergency_stop( 0 );
+    }
+    else {
+        return 0;
+    }
+
+    return 1;
+}
+
+
+int cmd_track_power( const char *cmd )
+{
+    if ( *cmd == '+' ) {
+        track_set_power( main_track, 1 );
+    }
+    else if ( *cmd == '-' ) {
+        track_set_power( main_track, 0 );
     }
     else {
         return 0;

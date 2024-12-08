@@ -47,7 +47,7 @@ int main( void )
     serial_puts( version_string );
     serial_puts( "\r\n" );
     
-    track_set_power( main_track, 1 );
+    //track_set_power( main_track, 1 );
 
     while ( 1 ) {
         if ( serial_get_command( cmd, sizeof( cmd ) ) ) {
