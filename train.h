@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-enum { DCC_MODE_14, DCC_MODE_28, DCC_MODE_128 };
+enum { DCC_MODE_28, DCC_MODE_128, DCC_MODE_14 };
 
 enum { TRAIN_BACKWARD, TRAIN_FORWARD };
 
@@ -35,6 +35,8 @@ typedef struct Train {
 } Train;
 
 extern Train *trains;
+
+void trains_remove_all( void );
 
 Train *train_new( uint16_t addr );
 Train *train_init( Train *train, uint16_t addr );

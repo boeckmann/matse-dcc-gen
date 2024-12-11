@@ -31,17 +31,22 @@ Folgende Kommandos werden akzeptiert, dabei steht z für eine gültige Lokadress
 
     !I        Versionsinformation abrufen
 
-    !zC+      14 Fahrstufen-Modus für Zug z
-    !zC0      14 Fahrstufen-Modus
-    !zC-      28 Fahrstufen-Modus für Zug z (standard)
-    !zC1      28 Fahrstufen-Modus
-    !zC2      128 Fahrstufen für Zug z
+    !R        Reset: DCC-Reset Pakete senden,
+              alle Züge deaktivieren und Geschwindigkeit sowie Funktionen zurücksetzen
 
+    !P+       Gleisspeisung ein
+    !P-       Gleisspeisung aus
     !H+       Nothalt für alle Züge ein
     !H-       Nothalt aus
 
     !zA+      DCC Signal Zug z aktivieren
     !zA-      DCC Signal Zug z deaktivieren
+
+    !zC+      14 Fahrstufen-Modus für Zug z
+    !zC0      14 Fahrstufen-Modus
+    !zC-      28 Fahrstufen-Modus für Zug z (standard)
+    !zC1      28 Fahrstufen-Modus
+    !zC2      128 Fahrstufen für Zug z
 
     !zVn      Vorwärtsgeschwindigkeit n für Zug z setzen
     !zRn      Rückwärtsgeschwindigkeit n für Zug z setzen
@@ -49,8 +54,9 @@ Folgende Kommandos werden akzeptiert, dabei steht z für eine gültige Lokadress
     !zFn+     Funktion n für Zug z aktivieren
     !zFn-     Funktion n für Zug z deaktivieren
 
-Im folgenden Beispiel wird die Generierung des Signals für Lokadresse 1 aktiviert, das Fahrtlicht eingeschaltet (Funktion 0) und die Geschwindigkeitsstufe 14 (vorwärts) gesetzt. Sofern alles elektrisch richtig verdrahtet ist sollte sich eine DCC konforme Lok daraufhin in Bewegung setzen.
+Im folgenden Beispiel wird die Gleisspeisung sowie die Generierung des Signals für Lokadresse 1 aktiviert, das Fahrtlicht eingeschaltet (Funktion 0) und die Geschwindigkeitsstufe 14 (vorwärts) gesetzt. Sofern alles elektrisch richtig verdrahtet ist sollte sich eine DCC konforme Lok daraufhin in Bewegung setzen.
 
+    !P+
     !1A+
     !1F0+
     !1V14

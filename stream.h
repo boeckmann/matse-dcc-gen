@@ -28,6 +28,7 @@ extern volatile uint8_t repeated_stream_count;
 extern uint8_t repeated_stream_type;
 extern Train *repeated_stream_train;
 
+void stream_dcc_reset( void );
 void plan_next_stream( void );
 Stream *build_next_stream( void );
 void activate_emergency_stop( int8_t stop );

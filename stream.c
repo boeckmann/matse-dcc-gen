@@ -6,7 +6,7 @@
 #include <util/atomic.h>
 
 volatile uint8_t repeated_stream_count = 0;  // Anzahl an Wiederholungen für aktuellen Stream
-uint8_t repeated_stream_type;
+uint8_t repeated_stream_type = STREAM_NONE;
 Train *repeated_stream_train = NULL;
 
 volatile uint8_t num_addresses_active = 0;
@@ -20,14 +20,18 @@ static Stream estop128_stream = { .length = 4,
 
 static Stream idle_stream = { .length = 3, .data = { 0xff, 0x00, 0xff } };
 
-static Stream reset_stream = { .length = 3, .data = { 0xff, 0x00, 0xff } };
+static Stream reset_stream = { .length = 3, .data = { 0x00, 0x00, 0x00 } };
 
 
 void activate_emergency_stop( int8_t stop ) { estop = stop; }
 
-void stream_request( uint8_t stream, uint8_t repeat, Train *train )
+void stream_dcc_reset( void )
 {
-    ATOMIC_BLOCK( ATOMIC_RESTORESTATE ) {}
+    ATOMIC_BLOCK( ATOMIC_RESTORESTATE )
+    {
+        repeated_stream_type = STREAM_RESET;
+        repeated_stream_count = 20;
+    }
 }
 
 static void gen_speed_stream( Train *train, Stream *stream );
@@ -108,7 +112,7 @@ void plan_next_stream( void )
     stream_odd = ~stream_odd; // markiert jedes zweite Datenpaket
 
     // Nothalt hat Priorität
-    if ( estop ) {
+    if ( estop && repeated_stream_type != STREAM_RESET && repeated_stream_type != STREAM_IDLE ) {
         stream_type = ( stream_odd ) ? STREAM_ESTOP : STREAM_ESTOP128;
         return;
     }
@@ -118,6 +122,17 @@ void plan_next_stream( void )
         stream_type = repeated_stream_type;
         stream_train = repeated_stream_train;
         repeated_stream_count--;
+
+        if ( repeated_stream_count == 0 ) {
+            if ( repeated_stream_type == STREAM_RESET ) {
+                // Dem Reset müssen laut Spezifikation 10 IDLE Pakete folgen.
+                repeated_stream_type = STREAM_IDLE;
+                repeated_stream_count = 10;
+            }
+            else {
+                repeated_stream_type = STREAM_NONE;
+            }
+        }
         return;
     }
 

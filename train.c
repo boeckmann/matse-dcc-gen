@@ -12,6 +12,34 @@
 Train *trains = NULL;
 Train *last_train = NULL;
 
+void trains_remove_all( void )
+{
+    Train *t = trains, *t_next;
+
+    if ( t == NULL ) {
+        return;
+    }
+
+
+    ATOMIC_BLOCK( ATOMIC_RESTORESTATE )
+    {
+        num_addresses_active = 0;
+        if ( repeated_stream_type == STREAM_TRAIN ) {
+            repeated_stream_count = 0;
+            repeated_stream_type = STREAM_NONE;
+        }
+    }
+
+    do {
+        t_next = t->next;
+        free( t );
+        t = t_next;
+    } while ( t != trains );
+
+    trains = last_train = NULL;
+}
+
+
 Train *train_new( uint16_t addr )
 {
     Train *train = malloc( sizeof( Train ) );
@@ -45,8 +73,8 @@ Train *train_init( Train *train, uint16_t addr )
 {
     memset( train, 0, sizeof( Train ) );
 
-    train->dcc_mode = DCC_MODE_28;
     train->addr = addr;
+    train->dcc_mode = DCC_MODE_28;
     train->direction = TRAIN_FORWARD;
     train->stream_type =
         SPEED_AND_DIR; // set to SPEED_AND_DIR on first scheduling
@@ -125,10 +153,14 @@ void train_set_speed_and_dir( Train *train, uint8_t speed, uint8_t dir )
     train->stream_type = SPEED_AND_DIR;
 
     if ( train->active ) {
-        repeated_stream_count = 0;  // prevent ISR from reading train and type
-        repeated_stream_type = STREAM_TRAIN;
-        repeated_stream_train = train;
-        repeated_stream_count = DEFAULT_STREAM_REPITITIONS;
+        ATOMIC_BLOCK( ATOMIC_RESTORESTATE )
+        {
+            if ( repeated_stream_type == STREAM_NONE || repeated_stream_type == STREAM_TRAIN ) {
+                repeated_stream_type = STREAM_TRAIN;
+                repeated_stream_train = train;
+                repeated_stream_count = DEFAULT_STREAM_REPITITIONS;
+            }
+        }
     }
 }
 
@@ -189,9 +221,13 @@ static void train_schedule_function( Train *train, uint8_t f )
     train->stream_type = stream;
 
     if ( train->active ) {
-        repeated_stream_count = 0;  // prevent ISR from reading train and type
-        repeated_stream_type = STREAM_TRAIN;
-        repeated_stream_train = train;
-        repeated_stream_count = DEFAULT_STREAM_REPITITIONS;
+        ATOMIC_BLOCK( ATOMIC_RESTORESTATE )
+        {
+            if ( repeated_stream_type == STREAM_NONE || repeated_stream_type == STREAM_TRAIN ) {
+                repeated_stream_type = STREAM_TRAIN;
+                repeated_stream_train = train;
+                repeated_stream_count = DEFAULT_STREAM_REPITITIONS;
+            }
+        }
     }
 }

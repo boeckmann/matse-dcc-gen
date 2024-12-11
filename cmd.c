@@ -3,6 +3,7 @@
 #include "stream.h"
 #include "train.h"
 #include "track.h"
+#include "reset.h"
 #include "util.h"
 #include "version.h"
 #include <ctype.h>
@@ -28,6 +29,9 @@ int cmd_process( const char *cmd )
 
     if ( *cmd == 'H' ) { // NOTHALT
         return cmd_emergency_stop( cmd + 1 );
+    }
+    else if ( *cmd == 'R' ) {
+        return system_reset();
     }
     else if ( *cmd == 'P' ) { // TRACK POWER
         return cmd_track_power( cmd + 1 );
@@ -69,6 +73,7 @@ int cmd_track_power( const char *cmd )
 {
     if ( *cmd == '+' ) {
         track_set_power( main_track, 1 );
+        stream_dcc_reset(); // DCC Controller nach power-on zurücksetzen
     }
     else if ( *cmd == '-' ) {
         track_set_power( main_track, 0 );
