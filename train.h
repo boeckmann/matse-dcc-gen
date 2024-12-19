@@ -37,9 +37,11 @@ typedef struct Train {
 extern Train *trains;
 
 void trains_remove_all( void );
+void trains_reset_speed_and_functions( void );
 
 Train *train_new( uint16_t addr );
 Train *train_init( Train *train, uint16_t addr );
+void train_reset_speed_and_functions( Train *train );
 
 void train_activate( Train *train );
 void train_deactivate( Train *train );

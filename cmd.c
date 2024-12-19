@@ -33,6 +33,11 @@ int cmd_process( const char *cmd )
     else if ( *cmd == 'R' ) {
         return system_reset();
     }
+    else if (*cmd == 'S' ) {
+        trains_reset_speed_and_functions();
+        return 1;
+    }
+
     else if ( *cmd == 'P' ) { // TRACK POWER
         return cmd_track_power( cmd + 1 );
     }

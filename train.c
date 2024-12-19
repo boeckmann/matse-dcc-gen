@@ -40,6 +40,21 @@ void trains_remove_all( void )
 }
 
 
+void trains_reset_speed_and_functions( void )
+{
+    Train *t = trains;
+
+    if ( t == NULL ) {
+        return;
+    }
+
+    do {
+        train_reset_speed_and_functions( t );
+        t = t->next;
+    } while ( t != trains );
+}
+
+
 Train *train_new( uint16_t addr )
 {
     Train *train = malloc( sizeof( Train ) );
@@ -82,6 +97,11 @@ Train *train_init( Train *train, uint16_t addr )
     return train;
 }
 
+void train_reset_speed_and_functions( Train *train )
+{
+    train->speed = 0;
+    memset( train->functions, 0, sizeof(train->functions) );
+}
 
 void train_activate( Train *train )
 {

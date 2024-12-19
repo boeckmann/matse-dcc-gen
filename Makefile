@@ -7,10 +7,10 @@
 NAME=matse-dcc-gen
 DEVICE=atmega328p
 FREQ=16000000
-OBJS=main.o stream.o cmd.o isr_dcc.o serial.o ticks.o track.o train.o util.o version.o
+OBJS=main.o stream.o cmd.o isr_dcc.o serial.o ticks.o track.o train.o reset.o util.o version.o
 
 # programmer settings
-PORT?=/dev/cu.usbmodem1101
+PORT?=/dev/cu.usbmodem101
 BAUD?=115200
 PROGRAMMER=arduino
 
