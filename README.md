@@ -33,6 +33,7 @@ Folgende Kommandos werden akzeptiert, dabei steht z für eine gültige Lokadress
 
     !R        Reset: DCC-Reset Pakete senden,
               alle Züge deaktivieren und Geschwindigkeit sowie Funktionen zurücksetzen
+    !S        Geschwindigkeit und Funktionen aller Züge zurücksetzen
 
     !P+       Gleisspeisung ein
     !P-       Gleisspeisung aus
